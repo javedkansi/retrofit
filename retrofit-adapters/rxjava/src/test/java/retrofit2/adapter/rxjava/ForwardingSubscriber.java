@@ -13,19 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package retrofit2.helpers;
+package retrofit2.adapter.rxjava;
 
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Type;
-import retrofit2.CallAdapter;
-import retrofit2.Retrofit;
+import rx.Subscriber;
 
-public final class NonMatchingCallAdapterFactory extends CallAdapter.Factory {
-  public boolean called;
+abstract class ForwardingSubscriber<T> extends Subscriber<T> {
+  private final Subscriber<T> delegate;
 
-  @Override
-  public CallAdapter<?, ?> get(Type returnType, Annotation[] annotations, Retrofit retrofit) {
-    called = true;
-    return null;
+  ForwardingSubscriber(Subscriber<T> delegate) {
+    this.delegate = delegate;
+  }
+
+  @Override public void onNext(T value) {
+    delegate.onNext(value);
+  }
+
+  @Override public void onCompleted() {
+    delegate.onCompleted();
+  }
+
+  @Override public void onError(Throwable throwable) {
+    delegate.onError(throwable);
   }
 }

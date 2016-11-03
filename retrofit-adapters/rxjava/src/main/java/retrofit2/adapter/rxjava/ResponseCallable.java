@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Square, Inc.
+ * Copyright (C) 2016 Jake Wharton
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,23 +15,20 @@
  */
 package retrofit2.adapter.rxjava;
 
-import java.lang.reflect.Type;
+import java.io.IOException;
+import java.util.concurrent.Callable;
 import retrofit2.Call;
-import retrofit2.CallAdapter;
-import rx.Observable;
-import rx.Single;
+import retrofit2.Response;
 
-final class SingleHelper {
-  static CallAdapter<Single<?>> makeSingle(final CallAdapter<Observable<?>> callAdapter) {
-    return new CallAdapter<Single<?>>() {
-      @Override public Type responseType() {
-        return callAdapter.responseType();
-      }
+final class ResponseCallable<T> implements Callable<Response<T>> {
+  private final Call<T> call;
 
-      @Override public <R> Single<?> adapt(Call<R> call) {
-        Observable<?> observable = callAdapter.adapt(call);
-        return observable.toSingle();
-      }
-    };
+  ResponseCallable(Call<T> call) {
+    this.call = call;
+  }
+
+  @Override public Response<T> call() throws IOException {
+    // Since Call is a one-shot type, clone it for each new caller.
+    return call.clone().execute();
   }
 }

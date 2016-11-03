@@ -1435,21 +1435,6 @@ public final class RequestBuilderTest {
     assertBody(request.body(), "");
   }
 
-  @Test public void bodyResponseBody() {
-    class Example {
-      @POST("/foo/bar/") //
-      Call<ResponseBody> method(@Body RequestBody body) {
-        return null;
-      }
-    }
-    RequestBody body = RequestBody.create(TEXT_PLAIN, "hi");
-    Request request = buildRequest(Example.class, body);
-    assertThat(request.method()).isEqualTo("POST");
-    assertThat(request.headers().size()).isZero();
-    assertThat(request.url().toString()).isEqualTo("http://example.com/foo/bar/");
-    assertBody(request.body(), "hi");
-  }
-
   @Test public void bodyRequired() {
     class Example {
       @POST("/foo/bar/") //
@@ -2486,6 +2471,25 @@ public final class RequestBuilderTest {
     }
   }
 
+  @Test public void multipartPartsShouldBeInOrder() throws IOException {
+    class Example {
+      @Multipart
+      @POST("/foo")
+      Call<ResponseBody> get(@Part("first") String data, @Part("second") String dataTwo, @Part("third") String dataThree) {
+        return null;
+      }
+    }
+    Request request = buildRequest(Example.class, "firstParam", "secondParam", "thirdParam");
+    MultipartBody body = (MultipartBody) request.body();
+
+    Buffer buffer = new Buffer();
+    body.writeTo(buffer);
+    String readBody = buffer.readUtf8();
+
+    assertThat(readBody.indexOf("firstParam")).isLessThan(readBody.indexOf("secondParam"));
+    assertThat(readBody.indexOf("secondParam")).isLessThan(readBody.indexOf("thirdParam"));
+  }
+
   private static void assertBody(RequestBody body, String expected) {
     assertThat(body).isNotNull();
     Buffer buffer = new Buffer();
@@ -2497,7 +2501,7 @@ public final class RequestBuilderTest {
     }
   }
 
-  static Request buildRequest(Class<?> cls, Object... args) {
+  static <T> Request buildRequest(Class<T> cls, Object... args) {
     final AtomicReference<Request> requestRef = new AtomicReference<>();
     okhttp3.Call.Factory callFactory = new okhttp3.Call.Factory() {
       @Override public okhttp3.Call newCall(Request request) {
@@ -2513,9 +2517,11 @@ public final class RequestBuilderTest {
         .build();
 
     Method method = TestingUtils.onlyMethod(cls);
-    ServiceMethod<?> serviceMethod = retrofit.loadServiceMethod(method);
-    OkHttpCall<?> okHttpCall = new OkHttpCall<>(serviceMethod, args);
-    Call<?> call = (Call<?>) serviceMethod.callAdapter.adapt(okHttpCall);
+    //noinspection unchecked
+    ServiceMethod<T, Call<T>> serviceMethod =
+        (ServiceMethod<T, Call<T>>) retrofit.loadServiceMethod(method);
+    Call<T> okHttpCall = new OkHttpCall<>(serviceMethod, args);
+    Call<T> call = serviceMethod.callAdapter.adapt(okHttpCall);
     try {
       call.execute();
       throw new AssertionError();
